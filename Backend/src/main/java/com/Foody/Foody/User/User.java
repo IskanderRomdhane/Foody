@@ -1,5 +1,6 @@
 package com.Foody.Foody.User;
 
+import com.Foody.Foody.Biometrics.Biometrics;
 import com.Foody.Foody.Food.Food;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -23,11 +24,11 @@ public class User {
     private String firstname;
     private String lastname;
 
-    private Float weight;
-    private Float height;
-    private Float ibm;
+    // Properly mapped one-to-many relationship
+    @OneToMany(mappedBy = "user_id", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    private List<Biometrics> biometrics;
 
-    @OneToMany
+    @OneToMany(fetch = FetchType.LAZY)
     private List<Food> eatenFood;
-
 }
+

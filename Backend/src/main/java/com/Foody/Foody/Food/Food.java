@@ -14,7 +14,7 @@ import lombok.Setter;
 @Setter
 public class Food {
     @Id
-    private Integer id ;
+    private Integer barcode ;
 
     private String name;
 

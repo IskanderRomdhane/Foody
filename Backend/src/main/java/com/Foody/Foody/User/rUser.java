@@ -7,7 +7,9 @@ public record rUser(
 
         Float weight,
 
-        Float height
+        Float height,
+
+        Integer age
 
 ) {
 }
