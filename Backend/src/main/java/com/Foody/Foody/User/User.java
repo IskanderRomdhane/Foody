@@ -24,7 +24,7 @@ public class User {
     private String firstname;
     private String lastname;
 
-    // Properly mapped one-to-many relationship
+
     @OneToMany(mappedBy = "user_id", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     private List<Biometrics> biometrics;
 
