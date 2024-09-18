@@ -20,6 +20,8 @@ public class Biometrics {
     private Integer id;
 
     private Integer age;
+    private String gender;
+
     private Float weight;
     private Float height;
     private Float ibm;
@@ -28,6 +30,15 @@ public class Biometrics {
 
     private Integer user_id;
 
+    //Daily Intake
+    private Float proteinIntake;
+    private Float caloriesIntake;
+    private Float carbsIntake;
+    private Float fatsIntake;
+
+    private String goal;
+
+    private String activityLevel;
     public String getBodyType() {
         if (ibm < 18.5) {
             return "Underweight";
