@@ -9,7 +9,12 @@ public record rUser(
 
         Float height,
 
-        Integer age
+        Integer age,
+        String gender,
+
+        String goal,
+
+        String activityLevel
 
 ) {
 }

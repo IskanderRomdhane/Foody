@@ -2,39 +2,31 @@ package com.Foody.Foody.User;
 
 import com.Foody.Foody.Biometrics.Biometrics;
 import com.Foody.Foody.Biometrics.BiometricsRepository;
+import com.Foody.Foody.Food.FoodRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
     private final BiometricsRepository biometricsRepository;
-    public ResponseEntity<String> createUser(rUser rUser) {
+    private final FoodRepository foodRepository;
+    public ResponseEntity<String> createUser(rUser userDetails) {
         try {
 
             User createdUser = User.builder()
-                    .firstname(rUser.firstname())
-                    .lastname(rUser.lastname())
+                    .firstname(userDetails.firstname())
+                    .lastname(userDetails.lastname())
                     .build();
             userRepository.save(createdUser);
 
-            Biometrics userBiometrics = Biometrics.builder()
-                    .age(rUser.age())
-                    .height(rUser.height())
-                    .weight(rUser.weight())
-                    .ibm(rUser.weight() * 10000 / (rUser.height() * rUser.height()))
-                    .user_id(createdUser.getId())
-                    .cDate(LocalDate.now())
-                    .build();
-            biometricsRepository.save(userBiometrics);
+            Biometrics userBiometrics = createOrUpdateBiometrics(userDetails , createdUser);
 
             createdUser.setBiometrics(List.of(userBiometrics));
             userRepository.save(createdUser);
@@ -52,19 +44,10 @@ public class UserService {
             Optional<User> userOptional = userRepository.findById(userId);
             if (userOptional.isPresent()) {
                 User foundUser = userOptional.get();
-
                 foundUser.setFirstname(userDetails.firstname());
                 foundUser.setLastname(userDetails.lastname());
 
-                Biometrics newBiometrics = Biometrics.builder()
-                        .age(userDetails.age())
-                        .height(userDetails.height())
-                        .weight(userDetails.weight())
-                        .ibm(userDetails.weight() * 10000 / (userDetails.height() * userDetails.height()))
-                        .user_id(foundUser.getId())
-                        .cDate(LocalDate.now())
-                        .build();
-
+                Biometrics newBiometrics = createOrUpdateBiometrics(userDetails , foundUser);
                 List<Biometrics> biometricsList = foundUser.getBiometrics();
                 if (biometricsList == null) {
                     biometricsList = new ArrayList<>();
@@ -72,9 +55,8 @@ public class UserService {
                 biometricsList.add(newBiometrics);
 
                 foundUser.setBiometrics(biometricsList);
-
-                biometricsRepository.save(newBiometrics);
                 userRepository.save(foundUser);
+
                 return ResponseEntity.ok("Saved User Successfully");
             } else {
                 return ResponseEntity.notFound().build();
@@ -83,6 +65,40 @@ public class UserService {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error Editing user: " + e.getMessage());
         }
+    }
+
+    private Biometrics createOrUpdateBiometrics(rUser userDetails, User user) {
+        Biometrics newBiometrics = Biometrics.builder()
+                .age(userDetails.age())
+                .height(userDetails.height())
+                .weight(userDetails.weight())
+                .ibm(userDetails.weight() * 10000 / (userDetails.height() * userDetails.height()))
+                .user_id(user.getId())
+                .cDate(LocalDate.now())
+                .gender(userDetails.gender())
+                .activityLevel(userDetails.activityLevel())
+                .goal(userDetails.goal())
+                .build();
+
+        float bmr = calculateBMR(newBiometrics);
+        float tdee = calculateTDEE(bmr, userDetails.activityLevel());
+
+        Map<String, String> goals = calculateCaloricGoals(tdee);
+
+        String caloriesIntakeString = goals.get(userDetails.goal());
+        float caloriesIntake = Float.parseFloat(caloriesIntakeString);
+
+        float proteinIntake = caloriesIntake * 0.15F / 4; // 15% of calories from protein
+        float carbsIntake = caloriesIntake * 0.55F / 4;   // 55% of calories from carbs
+        float fatsIntake = caloriesIntake * 0.30F / 9;    // 30% of calories from fats
+
+        newBiometrics.setCaloriesIntake(caloriesIntake);
+        newBiometrics.setProteinIntake(proteinIntake);
+        newBiometrics.setCarbsIntake(carbsIntake);
+        newBiometrics.setFatsIntake(fatsIntake);
+
+        biometricsRepository.save(newBiometrics);
+        return  newBiometrics;
     }
 
     public ResponseEntity<?> getUserWithBiometrics(Integer userId) {
@@ -110,4 +126,140 @@ public class UserService {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
     }
+
+
+
+    public ResponseEntity<Map<String, String>> calculateCalorieNeeds(Integer userId, String activityLevel) {
+        Optional<User> userOptional = userRepository.findById(userId);
+
+        if (userOptional.isPresent()) {
+            try {
+                User foundUser = userOptional.get();
+                List<Biometrics> biometricsList = foundUser.getBiometrics();
+
+                Biometrics currentBiometrics = biometricsList.get(biometricsList.size() - 1);
+                float bmr = calculateBMR(currentBiometrics);
+                float tdee = calculateTDEE(bmr, activityLevel);
+
+                Map<String, String> caloricGoals = calculateCaloricGoals(tdee);
+
+                return ResponseEntity.ok(caloricGoals);
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Collections.singletonMap("error", "Error calculating calorie needs: " + e.getMessage()));
+            }
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", "User not found"));
+        }
+    }
+
+    private float calculateBMR(Biometrics biometrics) {
+        float weight = biometrics.getWeight();
+        float height = biometrics.getHeight();
+        int age = biometrics.getAge();
+        String gender = biometrics.getGender();
+
+        if (gender.equalsIgnoreCase("male")) {
+            return (10 * weight) + (6.25f * height) - (5 * age) + 5;
+        } else if (gender.equalsIgnoreCase("female")) {
+            return (10 * weight) + (6.25f * height) - (5 * age) - 161;
+        } else {
+            throw new IllegalArgumentException("Gender must be either 'male' or 'female'");
+        }
+    }
+
+    private float calculateTDEE(float bmr, String activityLevel) {
+        return switch (activityLevel.toLowerCase()) {
+            case "sedentary" -> bmr * 1.2f;
+            case "lightly active" -> bmr * 1.375f;
+            case "moderately active" -> bmr * 1.55f;
+            case "very active" -> bmr * 1.725f;
+            case "super active" -> bmr * 1.9f;
+            default -> throw new IllegalArgumentException("Invalid activity level provided");
+        };
+    }
+
+    private Map<String, String> calculateCaloricGoals(float tdee) {
+        Map<String, String> caloricGoals = new HashMap<>();
+        caloricGoals.put("maintainWeight", String.format("%.2f", tdee));
+        caloricGoals.put("gradualGain", String.format("%.2f", tdee + 375));
+        caloricGoals.put("extremeGain", String.format("%.2f", tdee + 750));
+        caloricGoals.put("gradualLoss", String.format("%.2f", tdee - 375));
+        caloricGoals.put("extremeLoss", String.format("%.2f", tdee - 750));
+        return caloricGoals;
+    }
+
+    public ResponseEntity<?> getUserWeeklyWeightProgression(Integer userId) {
+        Optional<User> userOptional = userRepository.findById(userId);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+
+            List<Biometrics> biometricsList = user.getBiometrics();
+            Map<String, Float> progression = new HashMap<>();
+            Integer weekN = 0;
+
+            if (!biometricsList.isEmpty()) {
+                Biometrics previousBiometrics = biometricsList.get(0);
+                weekN++;
+                progression.put("Week" + weekN, previousBiometrics.getWeight());
+
+                for (int i = 1; i < biometricsList.size(); i++) {
+                    Biometrics currentBiometrics = biometricsList.get(i);
+
+                    if (previousBiometrics.getCDate().plusWeeks(1).isBefore(currentBiometrics.getCDate())
+                            || previousBiometrics.getCDate().plusWeeks(1).isEqual(currentBiometrics.getCDate())) {
+                        weekN++;
+                        progression.put("Week" + weekN, currentBiometrics.getWeight());
+                        previousBiometrics = currentBiometrics;
+                    }
+                }
+
+            }
+            return ResponseEntity.ok(progression);
+
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+    }
+    public ResponseEntity<?> isAchievingGoal(Integer userId) {
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+
+            List<Biometrics> biometricsList = user.getBiometrics();
+            Boolean goal = false;
+            Biometrics first = biometricsList.get(0);
+            Biometrics last = biometricsList.get(biometricsList.size() - 1);
+            switch (first.getGoal()) {
+                case "maintainWeight" -> {
+                    goal = (last.getWeight() - first.getWeight()) == 0;
+                }
+                case "gradualGain" -> {
+                    // For gradual gain, we expect a small weight increase like 1-2 kg
+                    goal = (last.getWeight() - first.getWeight()) > 0 && (last.getWeight() - first.getWeight()) <= 2;
+                }
+                case "extremeGain" -> {
+                    // For extreme gain, we expect weight increase over 2 kg
+                    goal = (last.getWeight() - first.getWeight()) > 2;
+                }
+                case "gradualLoss" -> {
+                    // For gradual loss, we expect weight decrease like 1-2 kg
+                    goal = (first.getWeight() - last.getWeight()) > 0 && (first.getWeight() - last.getWeight()) <= 2;
+                }
+                case "extremeLoss" -> {
+                    // For extreme loss, we expect a significant weight decrease over 2 kg
+                    goal = (first.getWeight() - last.getWeight()) > 2;
+                }
+                default -> throw new IllegalStateException("Unexpected goal: " + first.getGoal());
+            }
+            return ResponseEntity.ok(goal);
+        }
+        else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("User Not found");
+        }
+    }
+
 }

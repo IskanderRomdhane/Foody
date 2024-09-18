@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+
     @PostMapping("create-user")
     public ResponseEntity<String> createUser (
             @RequestBody rUser rUser
@@ -31,6 +32,21 @@ public class UserController {
     @GetMapping("/get-body-type/{userId}")
     public ResponseEntity<?> getUserBodyType(@PathVariable Integer userId) {
         return userService.getUserBodyType(userId);
+    }
+
+    @PostMapping("/calorie-needs/{userId}")
+    public ResponseEntity<?> calculateCalorieNeeds(@PathVariable Integer userId, @RequestParam String activityLevel) {
+        return ResponseEntity.ok(userService.calculateCalorieNeeds(userId, activityLevel));
+    }
+
+    @GetMapping("/get-weekly-weight-progression/{userId}")
+    public ResponseEntity<?> getUserWeeklyWeightProgression(@PathVariable Integer userId) {
+        return userService.getUserWeeklyWeightProgression(userId);
+    }
+
+    @GetMapping("/get-goal/{userId}")
+    public ResponseEntity<?> isAchievingGoal(@PathVariable Integer userId) {
+        return userService.isAchievingGoal(userId);
     }
 
 }
