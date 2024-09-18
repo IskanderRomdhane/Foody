@@ -3,10 +3,7 @@ package com.Foody.Foody.Food;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequestMapping("/food/")
@@ -32,5 +29,12 @@ public class FoodController {
             @RequestBody rFoodRequest request
     ) {
         return foodService.totalNutriments(request);
+    }
+
+    @GetMapping("/get-todays-needed-nutriments/{userId}")
+    public ResponseEntity<?> getTodayNeededNutriments(
+            @PathVariable Integer userId
+    ) {
+        return foodService.getTodayNeededNutriments(userId);
     }
 }

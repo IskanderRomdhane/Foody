@@ -1,5 +1,6 @@
 package com.Foody.Foody.Food;
 
+import com.Foody.Foody.Biometrics.Biometrics;
 import com.Foody.Foody.Biometrics.BiometricsRepository;
 import com.Foody.Foody.User.User;
 import com.Foody.Foody.User.UserRepository;
@@ -15,9 +16,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+
 @Service
 @RequiredArgsConstructor
 public class FoodService {
@@ -142,17 +142,21 @@ public class FoodService {
                     Float fat = 0F;
                     Float carbs = 0F;
 
-                    for(Food meal : eatenFood) {
+                    for (Food meal : eatenFood) {
                         calories += meal.getCalories();
                         protein += meal.getProtein();
                         fat += meal.getFat();
                         carbs += meal.getCarbs();
                     }
 
-                    return ResponseEntity.ok("Calories: " + calories +
-                            ", Protein: " + protein +
-                            ", Fat: " + fat +
-                            ", Carbs: " + carbs);
+                    Map<String, Float> nutrientMap = new HashMap<>();
+                    nutrientMap.put("calories", calories);
+                    nutrientMap.put("protein", protein);
+                    nutrientMap.put("fat", fat);
+                    nutrientMap.put("carbs", carbs);
+
+                    return ResponseEntity.ok(nutrientMap);
+
                 } else {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No meals found for today.");
                 }
@@ -166,5 +170,55 @@ public class FoodService {
                     .body("User Not found");
         }
     }
+
+    public ResponseEntity<?> getTodayNeededNutriments(Integer userId) {
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isPresent()) {
+            try {
+                User foundUser = user.get();
+                List<Biometrics> biometricsList = foundUser.getBiometrics();
+
+                Biometrics currentBiometrics = biometricsList.get(biometricsList.size() - 1);
+
+                rFoodRequest request = new rFoodRequest(userId, 0L,0F,LocalDate.now());
+
+                ResponseEntity<?> response = totalNutriments(request);
+                if (response.getStatusCode() == HttpStatus.OK && response.getBody() instanceof Map) {
+                    Map<String, Float> nutrientMap = (Map<String, Float>) response.getBody();
+                    Float caloriesLeft = 0F;
+                    Float proteinLeft = 0F;
+                    Float fatLeft = 0F;
+                    Float carbsLeft = 0F;
+
+                    for (String key : nutrientMap.keySet()) {
+                        float value = nutrientMap.get(key);
+                        switch (key.toLowerCase()) {
+                            case "calories" -> caloriesLeft = currentBiometrics.getCaloriesIntake() - value;
+                            case "protein" -> proteinLeft = currentBiometrics.getProteinIntake() - value;
+                            case "carbs" -> carbsLeft = currentBiometrics.getCarbsIntake() - value;
+                            case "fat" -> fatLeft = currentBiometrics.getFatsIntake() - value;
+                        }
+                    }
+                    Map<String, Float> nutrimentsLeft = new HashMap<>();
+                    nutrimentsLeft.put("calories", caloriesLeft);
+                    nutrimentsLeft.put("protein", proteinLeft);
+                    nutrimentsLeft.put("fat", fatLeft);
+                    nutrimentsLeft.put("carbs", carbsLeft);
+
+                    return ResponseEntity.ok(nutrimentsLeft);
+                }
+                else {return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Get request failed. ");}
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Get request failed. Error: " + e.getMessage());
+            }
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("User not found");
+        }
+    }
+
+
 
 }
