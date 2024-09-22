@@ -1,8 +1,6 @@
 package com.Foody.Foody.Food;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -17,6 +15,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class Food {
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Integer id;
+
     private Long barcode ;
 
     private String productName;
