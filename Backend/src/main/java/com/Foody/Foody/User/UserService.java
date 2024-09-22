@@ -3,9 +3,15 @@ package com.Foody.Foody.User;
 import com.Foody.Foody.Biometrics.Biometrics;
 import com.Foody.Foody.Biometrics.BiometricsRepository;
 import com.Foody.Foody.Food.FoodRepository;
+import com.Foody.Foody.Role.Role;
+import com.Foody.Foody.Security.JwtService;
+import com.Foody.Foody.auth.RegistrationRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -16,22 +22,46 @@ import java.util.*;
 public class UserService {
     private final UserRepository userRepository;
     private final BiometricsRepository biometricsRepository;
+    private final PasswordEncoder passwordEncoder;
     private final FoodRepository foodRepository;
-    public ResponseEntity<String> createUser(rUser userDetails) {
+    private final JwtService jwtService;
+    @Value("${application.security.jwt.secret-key}")
+    private String secretKey;
+    public ResponseEntity<?> createUser(RegistrationRequest request, Role userRole) {
         try {
-
-            User createdUser = User.builder()
-                    .firstname(userDetails.firstname())
-                    .lastname(userDetails.lastname())
+            // Build the new User entity
+            var user = User.builder()
+                    .firstname(request.getFirstname())
+                    .lastname(request.getLastname())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode(request.getPassword()))
+                    .accountLocked(false)
+                    .enabled(true)
+                    .roles(userRole)
                     .build();
-            userRepository.save(createdUser);
 
-            Biometrics userBiometrics = createOrUpdateBiometrics(userDetails , createdUser);
+            // Add the user to the role's user list
+            List<User> users = userRole.getUser();
+            if (users == null) {
+                users = new ArrayList<>();
+            }
+            users.add(user);
 
-            createdUser.setBiometrics(List.of(userBiometrics));
-            userRepository.save(createdUser);
+            // Save the user
+            userRepository.save(user);
 
-            return ResponseEntity.ok("User Created Successfully");
+            // Create and update the user's biometrics
+            Biometrics userBiometrics = createOrUpdateBiometrics(request, user);
+            user.setBiometrics(List.of(userBiometrics));
+
+            // Save the user again with the updated biometrics
+            userRepository.save(user);
+
+            return ResponseEntity.ok(user);
+
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Error saving user due to data integrity violation: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error creating user: " + e.getMessage());
@@ -46,8 +76,8 @@ public class UserService {
                 User foundUser = userOptional.get();
                 foundUser.setFirstname(userDetails.firstname());
                 foundUser.setLastname(userDetails.lastname());
-
-                Biometrics newBiometrics = createOrUpdateBiometrics(userDetails , foundUser);
+                RegistrationRequest request = mapToRegistrationRequest(userDetails);
+                Biometrics newBiometrics = createOrUpdateBiometrics(request , foundUser);
                 List<Biometrics> biometricsList = foundUser.getBiometrics();
                 if (biometricsList == null) {
                     biometricsList = new ArrayList<>();
@@ -67,25 +97,37 @@ public class UserService {
         }
     }
 
-    private Biometrics createOrUpdateBiometrics(rUser userDetails, User user) {
-        Biometrics newBiometrics = Biometrics.builder()
+    public RegistrationRequest mapToRegistrationRequest(rUser userDetails) {
+        return RegistrationRequest.builder()
                 .age(userDetails.age())
                 .height(userDetails.height())
                 .weight(userDetails.weight())
-                .ibm(userDetails.weight() * 10000 / (userDetails.height() * userDetails.height()))
-                .user_id(user.getId())
-                .cDate(LocalDate.now())
                 .gender(userDetails.gender())
                 .activityLevel(userDetails.activityLevel())
                 .goal(userDetails.goal())
                 .build();
+    }
+
+
+    private Biometrics createOrUpdateBiometrics(RegistrationRequest userDetails, User user) {
+        Biometrics newBiometrics = Biometrics.builder()
+                .age(userDetails.getAge())
+                .height(userDetails.getHeight())
+                .weight(userDetails.getWeight())
+                .ibm(userDetails.getWeight() * 10000 / (userDetails.getHeight() * userDetails.getHeight()))
+                .user_id(user.getId())
+                .cDate(LocalDate.now())
+                .gender(userDetails.getGender())
+                .activityLevel(userDetails.getActivityLevel())
+                .goal(userDetails.getGoal())
+                .build();
 
         float bmr = calculateBMR(newBiometrics);
-        float tdee = calculateTDEE(bmr, userDetails.activityLevel());
+        float tdee = calculateTDEE(bmr, userDetails.getActivityLevel());
 
         Map<String, String> goals = calculateCaloricGoals(tdee);
 
-        String caloriesIntakeString = goals.get(userDetails.goal());
+        String caloriesIntakeString = goals.get(userDetails.getGoal());
         float caloriesIntake = Float.parseFloat(caloriesIntakeString);
 
         float proteinIntake = caloriesIntake * 0.15F / 4; // 15% of calories from protein
@@ -101,19 +143,19 @@ public class UserService {
         return  newBiometrics;
     }
 
-    public ResponseEntity<?> getUserWithBiometrics(Integer userId) {
-        Optional<User> userOptional = userRepository.findById(userId);
+    public ResponseEntity<?> getUserWithBiometrics(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            return ResponseEntity.ok(user);
+            return ResponseEntity.ok(user.getBiometrics());
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
     }
 
-    public ResponseEntity<?> getUserBodyType(Integer userId) {
-        Optional<User> userOptional = userRepository.findById(userId);
+    public ResponseEntity<?> getUserBodyType(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
@@ -129,9 +171,8 @@ public class UserService {
 
 
 
-    public ResponseEntity<Map<String, String>> calculateCalorieNeeds(Integer userId, String activityLevel) {
-        Optional<User> userOptional = userRepository.findById(userId);
-
+    public ResponseEntity<Map<String, String>> calculateCalorieNeeds(String email, String activityLevel) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isPresent()) {
             try {
                 User foundUser = userOptional.get();
@@ -190,8 +231,8 @@ public class UserService {
         return caloricGoals;
     }
 
-    public ResponseEntity<?> getUserWeeklyWeightProgression(Integer userId) {
-        Optional<User> userOptional = userRepository.findById(userId);
+    public ResponseEntity<?> getUserWeeklyWeightProgression(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
@@ -223,8 +264,8 @@ public class UserService {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
     }
-    public ResponseEntity<?> isAchievingGoal(Integer userId) {
-        Optional<User> userOptional = userRepository.findById(userId);
+    public ResponseEntity<?> isAchievingGoal(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
@@ -261,5 +302,6 @@ public class UserService {
                     .body("User Not found");
         }
     }
+
 
 }

@@ -7,6 +7,8 @@ public record rFoodRequest(
         Long barcode,
         Float gramsEaten,
 
-        LocalDate Date
+        LocalDate Date ,
+
+        String foodName
 ) {
 }
