@@ -40,25 +40,35 @@ public class AuthenticationService {
     private final UserService userService;
     @Value("${application.mailing.frontend.activation-url}")
     private String activationUrl;
-    public void register(RegistrationRequest request) throws MessagingException {
+
+    public AuthenticationResponse register(RegistrationRequest request) throws MessagingException {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email is already in use: " + request.getEmail());
         }
-        var userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new IllegalStateException("ROLE USER was not initiated"));
-        ResponseEntity<?> response = userService.createUser(request, userRole);
+        ResponseEntity<?> response = userService.createUser(request);
         if (response.getStatusCode() == HttpStatus.OK && response.getBody() instanceof User) {
             User createdUser = (User) response.getBody();
-            try {
-                sendValidationEmail(createdUser);
-            } catch (MessagingException e) {
-                throw new MessagingException("Failed to send validation email: " + e.getMessage());
-            }
+
+
+            var claims = new HashMap<String, Object>();
+
+            var user = createdUser;
+            claims.put("fullName", createdUser.fullName());
+            claims.put("id" , createdUser.getId());
+            var jwtToken = jwtService.generateToken(claims, user);
+
+            return AuthenticationResponse.builder()
+                    .token(jwtToken)
+                    .build();
         } else {
             String errorMessage = response.getBody().toString();
             throw new MessagingException("Failed to create user: " + errorMessage);
         }
     }
+
+
+
+
 
 
     public AuthenticationResponse authenticate (AuthenticationRequest request) {
