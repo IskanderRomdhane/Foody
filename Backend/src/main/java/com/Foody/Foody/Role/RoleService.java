@@ -1,15 +1,8 @@
 package com.Foody.Foody.Role;
 
-import com.Foody.Foody.User.User;
 import com.Foody.Foody.User.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,7 +10,7 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
 
-    public ResponseEntity<Integer> addRole(nRole request) {
+ /*   public ResponseEntity<Integer> addRole(nRole request) {
         Role role = Role.builder()
                 .name(request.name())
                 .lastModifiedDate(LocalDateTime.now())
@@ -78,5 +71,5 @@ public class RoleService {
         } else {
             return ResponseEntity.notFound().build();
         }
-    }
+    }*/
 }

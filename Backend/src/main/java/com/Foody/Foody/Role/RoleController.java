@@ -1,14 +1,13 @@
 package com.Foody.Foody.Role;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 //@Controller
 @RequiredArgsConstructor
 @RequestMapping("/role")
 public class RoleController {
-   private final RoleService roleService;
+   /*private final RoleService roleService;
     @PostMapping("/create-role")
     private ResponseEntity<Integer> addRole(
             @RequestBody nRole request){
@@ -27,6 +26,6 @@ public class RoleController {
             @RequestParam String roleName
             ){
         return roleService.revokeRole(id , roleName);
-    }
+    }*/
 
 }
