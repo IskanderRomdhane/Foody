@@ -47,6 +47,13 @@
     @apply sm:pr-16 pr-8;
   }
 
+  .padding-wel {
+    @apply px-10;
+  }
+  .padding-reg {
+    @apply p-8;
+  }
+
   .padding-t {
     @apply sm:pt-24 pt-12;
   }
@@ -56,7 +63,7 @@
   }
 
   .info-text {
-    @apply font-montserrat text-slate-gray text-lg leading-7;
+    @apply font-montserrat text-slate-gray leading-7;
   }
 }
 
