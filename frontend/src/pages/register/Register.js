@@ -88,10 +88,15 @@ const Register = () => {
     setStep(step + 1);
   };
 
-  const prevStep = () => setStep(step - 1);
+  const prevStep = () => {
+    if(step === 1 ){
+      navigate("/login");
+    }
+    setStep(step - 1);
+    console.log(step)
+  }
 
   const handleRegister = async () => {
-    // Password validation
     const passwordValid = formData.password.length >= 8 && /[A-Z]/.test(formData.password);
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
 
@@ -140,8 +145,7 @@ const Register = () => {
         return <BioDetails formData={formData} setFormData={setFormData} Verify={verify} />;
       case 5:
         return <PersonalDetails formData={formData} setFormData={setFormData} Verify={verify} />;
-      default:
-        return <Goal formData={formData} setFormData={setFormData} Verify={verify} />;
+
     }
   };
 
@@ -172,7 +176,6 @@ const Register = () => {
                     <button
                         className="px-4 py-2 text-blue-500 bg-white border border-blue-500 rounded hover:bg-blue-100 transition duration-200 w-[150px] font-bold"
                         onClick={prevStep}
-                        disabled={step === 1}
                     >
                       Previous
                     </button>
