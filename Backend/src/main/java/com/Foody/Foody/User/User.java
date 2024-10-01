@@ -41,12 +41,12 @@ public class User  implements UserDetails, Principal {
     private String password;
     private boolean accountLocked;
     private boolean enabled;
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
+    @JoinColumn(name = "role_id") // Ensure this column exists in the database
     private Role roles;
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singleton(new SimpleGrantedAuthority("ROLE_" + this.roles.getName()));
+        return Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
 

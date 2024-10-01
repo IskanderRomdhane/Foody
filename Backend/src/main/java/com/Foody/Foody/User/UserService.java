@@ -3,7 +3,7 @@ package com.Foody.Foody.User;
 import com.Foody.Foody.Biometrics.Biometrics;
 import com.Foody.Foody.Biometrics.BiometricsRepository;
 import com.Foody.Foody.Food.FoodRepository;
-import com.Foody.Foody.Role.Role;
+import com.Foody.Foody.Role.RoleRepository;
 import com.Foody.Foody.Security.JwtService;
 import com.Foody.Foody.auth.RegistrationRequest;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +24,11 @@ public class UserService {
     private final BiometricsRepository biometricsRepository;
     private final PasswordEncoder passwordEncoder;
     private final FoodRepository foodRepository;
+    private final RoleRepository roleRepository;
     private final JwtService jwtService;
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;
-    public ResponseEntity<?> createUser(RegistrationRequest request, Role userRole) {
+    public ResponseEntity<?> createUser(RegistrationRequest request) {
         try {
             // Build the new User entity
             var user = User.builder()
@@ -37,18 +38,7 @@ public class UserService {
                     .password(passwordEncoder.encode(request.getPassword()))
                     .accountLocked(false)
                     .enabled(true)
-                    .roles(userRole)
                     .build();
-
-            // Add the user to the role's user list
-            List<User> users = userRole.getUser();
-            if (users == null) {
-                users = new ArrayList<>();
-            }
-            users.add(user);
-
-            // Save the user
-            userRepository.save(user);
 
             // Create and update the user's biometrics
             Biometrics userBiometrics = createOrUpdateBiometrics(request, user);
